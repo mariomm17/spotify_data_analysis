@@ -1,4 +1,0 @@
-# ANACONDA PROMPT MODO ADMIN!!!
-conda create --name spot_streamlit python==3.10
-conda activate spot_streamlit 
-conda install -c conda-forge streamlit
