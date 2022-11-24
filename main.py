@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 import requests
 import pandas as pd
-from utils import map_keys
+from utils import map_keys, map_modes
 
 # base URL of all Spotify API endpoints
 BASE_URL = 'https://api.spotify.com/v1/'
@@ -60,7 +60,7 @@ def get_artist_name(artist_id: str):
     return artist_name
 
 @st.cache
-def generate_df(artist_id: str):
+def get_tracks_info(artist_id: str):
 
     headers = spotify_connection()
 
@@ -89,6 +89,17 @@ def generate_df(artist_id: str):
     cols = cols[-1:] + cols[:-1]
     df_songs_pivot = df_songs_pivot[cols]
     return df_songs_pivot
+
+@st.cache
+def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_field: str):
+    df_group_field = df_tracks.groupby([group_field]).size().reset_index(drop=False).rename({0: 'occurrences'}, axis=1)
+    if group_field == 'key':
+        df_group_field[group_field] = df_group_field[group_field].map(map_keys)
+    elif group_field == 'mode':
+        df_group_field[group_field] = df_group_field[group_field].map(map_modes)
+    df_group_field['occurrences'] = round(df_group_field['occurrences'] / len(df), 2) * 100
+    df_group_field = df_group_field.sort_values(by=group_field)
+    return df_group_field
 
 try:
     search_term = st.radio(
@@ -124,7 +135,7 @@ try:
         "<p style='font-family: 'Gotham Rounded', sans-serif'>{}</p>".format(artist_name), unsafe_allow_html=True)
 
     try:
-        df = generate_df(artist_id)
+        df = get_tracks_info(artist_id)
         st.dataframe(df)
 
     except Exception as e:
@@ -133,25 +144,59 @@ try:
             {}""".format(e)
         )
 
-    st.write("Histograms")
+    tab1, tab2, tab3 = st.tabs(["By key", "By mode", "By key-mode"])
 
-    try:
-        df_keys = df.groupby(['key']).size().reset_index(drop=False).rename({0: 'occurrences'}, axis=1)
-        df_keys['key'] = df_keys['key'].map(map_keys)
-        df_keys['occurrences'] = round(df_keys['occurrences'] / len(df), 2) * 100
-        df_keys = df_keys.sort_values(by='key')
 
-        # Create distplot with custom bin_size
-        fig = px.histogram(df_keys, x='key', y='occurrences', color_discrete_sequence=['#1DB954'],
-                           labels={'key': 'Key', 'occurrences': 'Times it has been used (%)'})
+    with tab1:
+        try:
+            group_field = 'key'
+            df_keys = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
 
-        # Plot!
-        st.plotly_chart(fig)
+            # Create distplot with custom bin_size
+            fig = px.histogram(df_keys, x=group_field, y='occurrences', color_discrete_sequence=['#1DB954'],
+                               labels={group_field: 'Key', 'occurrences': 'Occurrences over total (%)'})
 
-    except Exception as e:
-        st.error(
-            """**Histogram could not be built for group/artist selected** \n
-            {}""".format(e))
+            # Plot!
+            st.plotly_chart(fig)
+
+        except Exception as e:
+            st.error(
+                """**Histogram could not be built for group/artist selected** \n
+                {}""".format(e))
+
+    with tab2:
+        try:
+            group_field = 'mode'
+            df_modes = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
+
+            # Create distplot with custom bin_size
+            fig = px.histogram(df_modes, x=group_field, y='occurrences', color_discrete_sequence=['#1DB954'],
+                               labels={group_field: 'Mode', 'occurrences': 'Occurrences over total (%)'})
+
+            # Plot!
+            st.plotly_chart(fig)
+
+        except Exception as e:
+            st.error(
+                """**Histogram could not be built for group/artist selected** \n
+                {}""".format(e))
+
+    with tab3:
+        try:
+            group_field = 'mode'
+            df_keys = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
+
+            # Create distplot with custom bin_size
+            fig = px.histogram(df_keys, x=group_field, y='occurrences', color_discrete_sequence=['#1DB954'],
+                               labels={group_field: 'Key', 'occurrences': 'Occurrences over total (%)'})
+
+            # Plot!
+            st.plotly_chart(fig)
+
+        except Exception as e:
+            st.error(
+                """**Histogram could not be built for group/artist selected** \n
+                {}""".format(e))
 
 except Exception as e:
     st.error(
