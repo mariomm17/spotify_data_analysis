@@ -1,14 +1,15 @@
 import streamlit as st
+import plotly.express as px
 import requests
 import pandas as pd
+from utils import map_keys
 
-
-
+# base URL of all Spotify API endpoints
+BASE_URL = 'https://api.spotify.com/v1/'
 @st.cache
-def generate_df():
-    CLIENT_ID = '4cbdd593d6554f9eb9375741f1c23cd4'
-    CLIENT_SECRET = '1183b6dd611e4bdbad58d16e5187ddc0'
-
+def spotify_connection():
+    CLIENT_ID = '3198847a0df0428498cd64c7cbb3bb72'
+    CLIENT_SECRET = '115b947ecf3044448a6265782d644f4c'
     AUTH_URL = 'https://accounts.spotify.com/api/token'
 
     # POST
@@ -17,7 +18,6 @@ def generate_df():
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET,
     })
-
     print(auth_response)
 
     # convert the response to JSON
@@ -30,39 +30,58 @@ def generate_df():
         'Authorization': 'Bearer {token}'.format(token=access_token)
     }
 
-    # base URL of all Spotify API endpoints
-    BASE_URL = 'https://api.spotify.com/v1/'
+    return headers
+
+@st.cache
+def get_artist_id(artist_name: str):
+    headers = spotify_connection()
+
+    query_result =requests.get(BASE_URL + 'search/', headers=headers, params={ 'q': artist_name, 'type': 'artist', 'limit':1}).json()
+    artist_id = query_result['artists']['items'][0]['id']
+
+    return artist_id
+
+@st.cache
+def get_artist_picture(artist_id: str):
+    headers = spotify_connection()
+
+    r_artist = requests.get(BASE_URL + 'artists/' + artist_id, headers=headers).json()
+    image_url = r_artist['images'][0]['url']
+
+    return image_url
+
+@st.cache
+def get_artist_name(artist_id: str):
+    headers = spotify_connection()
+
+    r_artist = requests.get(BASE_URL + 'artists/' + artist_id, headers=headers).json()
+    artist_name = r_artist['name']
+
+    return artist_name
+
+@st.cache
+def generate_df(artist_id: str):
+
+    headers = spotify_connection()
 
     df_songs = pd.DataFrame()
 
-    nonak_id = '1Sghk5FdovRZVQutvGK2PD'
-    lordmalvo_id = '0RpTnyHVl084J1I5V79gos'
-    latrinidad_id = '15KUuOUuBqWGiInJr8dZah'
+    r_albums = requests.get(BASE_URL + 'artists/' + artist_id + '/albums', headers=headers)
+    r_albums = r_albums.json()
+    for album in r_albums['items']:
+        album_id = album['id']
+        r_tracks = requests.get(BASE_URL + 'albums/' + album_id + '/tracks', headers=headers)
+        r_tracks = r_tracks.json()
+        for track in r_tracks['items']:
+            track_id = track['id']
+            track_name = track['name']
 
+            r_track = requests.get(BASE_URL + 'audio-features/' + track_id, headers=headers)
+            r_track = r_track.json()
 
-    artists = {nonak_id:'Nonak',
-               lordmalvo_id:'Lord Malvo',
-               latrinidad_id:'La Trinidad'}
-
-
-    for artist_id in artists.keys():
-        r_albums = requests.get(BASE_URL + 'artists/' + artist_id + '/albums', headers=headers)
-        r_albums = r_albums.json()
-        for album in r_albums['items']:
-            album_id = album['id']
-            r_tracks = requests.get(BASE_URL + 'albums/' + album_id + '/tracks', headers=headers)
-            r_tracks = r_tracks.json()
-            for track in r_tracks['items']:
-                track_id = track['id']
-                track_name = track['name']
-
-                r_track = requests.get(BASE_URL + 'audio-features/' + track_id, headers=headers)
-                r_track = r_track.json()
-                r_track['artist'] = artists[artist_id]
-
-                s = pd.Series(r_track, name=track_name)
-                s.index.name = track_name
-                df_songs[track_name] = s
+            s = pd.Series(r_track, name=track_name)
+            s.index.name = track_name
+            df_songs[track_name] = s
 
     df_songs_pivot = df_songs.T
 
@@ -72,17 +91,72 @@ def generate_df():
     return df_songs_pivot
 
 try:
-    df = generate_df()
-    st.dataframe(df)
+    search_term = st.radio(
+        "Search by:",
+        ('Artist name', 'Spotify artist ID'))
 
-    print("Histograms")
+    if search_term == 'Artist name':
+        artist_search_term = st.text_input('Introduce an artist name', 'Lord Malvo')
+        mode = 'name'
+    elif search_term == 'Spotify artist ID':
+        artist_search_term = st.text_input('Introduce a Spotify artist ID', '0RpTnyHVl084J1I5V79gos')
+        mode = 'id'
+
+    if mode == 'name':
+        artist_id = get_artist_id(artist_search_term)
+        artist_name = artist_search_term
+    elif mode == 'id':
+        artist_id = artist_search_term
+        artist_name = get_artist_name(artist_id)
+
+    picture_url = get_artist_picture(artist_id)
+
+    # Spotify picture
+    #st.markdown(
+    #    "<img alt='SPOTIFY' src='https://cdn-icons-png.flaticon.com/512/174/174872.png' width='57px' height='57px' style='text-align: center; float: left'></img>",
+    #    unsafe_allow_html=True)
+
+    # Artist picture
+    st.markdown(
+        "<img alt='ARTIST' src='{}' width='250px' height='250px' style='text-align: center; float: center'></img>".format(picture_url),
+        unsafe_allow_html=True)
+    st.markdown(
+        "<p style='font-family: 'Gotham Rounded', sans-serif'>{}</p>".format(artist_name), unsafe_allow_html=True)
+
+    try:
+        df = generate_df(artist_id)
+        st.dataframe(df)
+
+    except Exception as e:
+        st.error(
+            """**No data could be found for group/artist selected.** \n
+            {}""".format(e)
+        )
+
     st.write("Histograms")
-    st.bar_chart(df, x='key')
 
-except:
+    try:
+        df_keys = df.groupby(['key']).size().reset_index(drop=False).rename({0: 'occurrences'}, axis=1)
+        df_keys['key'] = df_keys['key'].map(map_keys)
+        df_keys['occurrences'] = round(df_keys['occurrences'] / len(df), 2) * 100
+        df_keys = df_keys.sort_values(by='key')
+
+        # Create distplot with custom bin_size
+        fig = px.histogram(df_keys, x='key', y='occurrences', color_discrete_sequence=['#1DB954'],
+                           labels={'key': 'Key', 'occurrences': 'Times it has been used (%)'})
+
+        # Plot!
+        st.plotly_chart(fig)
+
+    except Exception as e:
+        st.error(
+            """**Histogram could not be built for group/artist selected** \n
+            {}""".format(e))
+
+except Exception as e:
     st.error(
         """
-        **This demo requires internet access.**
-        Connection error: %s
-    """
+        **{}** \n
+        Error: %s
+    """.format(e)
     )
