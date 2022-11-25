@@ -93,7 +93,7 @@ def get_tracks_info(artist_id: str):
     df_songs_pivot = df_songs_pivot[cols]
     return df_songs_pivot
 
-def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_fields: [str]):
+def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_fields: str):
     df_aux = df_tracks.copy()
     df_aux['occurrences'] = 1
     if len(group_fields) == 1:
