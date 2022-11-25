@@ -93,18 +93,34 @@ def get_tracks_info(artist_id: str):
     df_songs_pivot = df_songs_pivot[cols]
     return df_songs_pivot
 
-@st.cache
-def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_field: str):
+def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_fields: [str]):
     df_aux = df_tracks.copy()
     df_aux['occurrences'] = 1
-    df_group_field = df_aux.groupby([group_field], as_index=False).agg({'occurrences': 'sum', 'album_name': 'first'})
-    if group_field == 'key':
-        df_group_field[group_field] = df_group_field[group_field].map(map_keys)
-    elif group_field == 'mode':
-        df_group_field[group_field] = df_group_field[group_field].map(map_modes)
-    #df_group_field['occurrences'] = round(df_group_field['occurrences'] / len(df), 2) * 100
-    df_group_field = df_group_field.sort_values(by=group_field)
-    return df_group_field
+    if len(group_fields) == 1:
+        group_field = group_fields[0]
+        df_group_field = df_aux.groupby([group_field, 'album_name'], as_index=False).agg({'occurrences': 'sum'})
+        if group_field == 'key':
+            df_group_field[group_field] = df_group_field[group_field].map(map_keys)
+        elif group_field == 'mode':
+            df_group_field[group_field] = df_group_field[group_field].map(map_modes)
+        df_group_field_final = df_group_field.sort_values(by=group_field)
+
+    elif len(group_fields) == 2:
+        group_new_field = '_'.join(group_fields)
+        for group_field in group_fields:
+            if group_field == 'key':
+                df_aux[group_field] = df_aux[group_field].map(map_keys)
+            elif group_field == 'mode':
+                df_aux[group_field] = df_aux[group_field].map(map_modes)
+
+        field1, field2 = group_fields
+        df_aux[group_new_field] = df_aux[field1] + ' ' + df_aux[field2]
+        df_group_field = df_aux.groupby([group_new_field, 'album_name'], as_index=False).agg({'occurrences': 'sum'})
+
+        #df_group_field['occurrences'] = round(df_group_field['occurrences'] / len(df), 2) * 100
+        df_group_field_final = df_group_field.sort_values(by=group_new_field)
+
+    return df_group_field_final
 
 try:
     st.title('Which keys and modes are the most used by artists?')
@@ -112,7 +128,7 @@ try:
         "Search by:",
         ('Artist name', 'Spotify artist ID'))
 
-    url = 'https://support.tunecore.com/hc/en-us/articles/360040325651-How-do-I-find-my-Artist-ID-for-Spotify-and-iTunes-#'
+    url = 'https://artists.spotify.com/help/article/finding-your-artist-url'
     st.caption('Check [this]({}) to know how to get the ID'.format(url))
 
     if search_term == 'Artist name':
@@ -142,7 +158,7 @@ try:
     with col2:
         st.write("**Artist name**: {}".format(artist_name))
         st.write("**Spotify artist ID**: {}".format(artist_id))
-        st.write("**Link to Spotify**:{} \n".format('https://open.spotify.com/artist/'+artist_id))
+        st.write("**Link to Spotify**: {} \n".format('https://open.spotify.com/artist/'+artist_id))
 
     try:
         df = get_tracks_info(artist_id)
@@ -162,11 +178,11 @@ try:
         try:
             st.write('Total number of songs by artist: {}'.format(n_total_tracks))
             group_field = 'key'
-            df_keys = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
+            df_keys = transform_dataframe_to_histogram(df_tracks=df, group_fields=[group_field])
 
             # Create distplot with custom bin_size
             fig = px.histogram(df_keys, x=group_field, y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
-                               labels={group_field: 'Key', 'album_name': 'Album name'})
+                               hover_data=['key', 'album_name'], labels={group_field: 'Key', 'album_name': 'Album name'})
             fig.update_layout(yaxis_title='Nº of occurrences')
 
             # Plot!
@@ -181,7 +197,7 @@ try:
         try:
             st.write('Total number of songs by artist: {}'.format(n_total_tracks))
             group_field = 'mode'
-            df_modes = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
+            df_modes = transform_dataframe_to_histogram(df_tracks=df, group_fields=[group_field])
 
             # Create distplot with custom bin_size
             fig = px.histogram(df_modes, x=group_field, y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
@@ -199,12 +215,11 @@ try:
     with tab3:
         try:
             st.write('Total number of songs by artist: {}'.format(n_total_tracks))
-            group_field = 'mode'
-            df_keys = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
+            df_keys = transform_dataframe_to_histogram(df_tracks=df, group_fields=['key', 'mode'])
 
             # Create distplot with custom bin_size
-            fig = px.histogram(df_keys, x=group_field, y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
-                               labels={group_field: 'Key', 'album_name': 'Album name'})
+            fig = px.histogram(df_keys, x='key_mode', y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
+                               labels={group_field: 'Key-Mode', 'album_name': 'Album name'})
             fig.update_layout(yaxis_title='Nº of occurrences')
 
             # Plot!
