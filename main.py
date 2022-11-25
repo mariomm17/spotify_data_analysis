@@ -8,14 +8,15 @@ from utils import map_keys, map_modes
 BASE_URL = 'https://api.spotify.com/v1/'
 @st.cache
 def spotify_connection():
-
+    CLIENT_ID = '3198847a0df0428498cd64c7cbb3bb72'
+    CLIENT_SECRET = '115b947ecf3044448a6265782d644f4c'
     AUTH_URL = 'https://accounts.spotify.com/api/token'
 
     # POST
     auth_response = requests.post(AUTH_URL, {
         'grant_type': 'client_credentials',
-        'client_id': st.secrets['CLIENT_ID'],
-        'client_secret': st.secrets['CLIENT_SECRET'],
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
     })
     print(auth_response)
 
