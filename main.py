@@ -70,6 +70,8 @@ def get_tracks_info(artist_id: str):
     r_albums = r_albums.json()
     for album in r_albums['items']:
         album_id = album['id']
+        album_name = album['name']
+        print(album_id)
         r_tracks = requests.get(BASE_URL + 'albums/' + album_id + '/tracks', headers=headers)
         r_tracks = r_tracks.json()
         for track in r_tracks['items']:
@@ -78,6 +80,7 @@ def get_tracks_info(artist_id: str):
 
             r_track = requests.get(BASE_URL + 'audio-features/' + track_id, headers=headers)
             r_track = r_track.json()
+            r_track['album_name'] = album_name
 
             s = pd.Series(r_track, name=track_name)
             s.index.name = track_name
@@ -92,19 +95,25 @@ def get_tracks_info(artist_id: str):
 
 @st.cache
 def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_field: str):
-    df_group_field = df_tracks.groupby([group_field]).size().reset_index(drop=False).rename({0: 'occurrences'}, axis=1)
+    df_aux = df_tracks.copy()
+    df_aux['occurrences'] = 1
+    df_group_field = df_aux.groupby([group_field], as_index=False).agg({'occurrences': 'sum', 'album_name': 'first'})
     if group_field == 'key':
         df_group_field[group_field] = df_group_field[group_field].map(map_keys)
     elif group_field == 'mode':
         df_group_field[group_field] = df_group_field[group_field].map(map_modes)
-    df_group_field['occurrences'] = round(df_group_field['occurrences'] / len(df), 2) * 100
+    #df_group_field['occurrences'] = round(df_group_field['occurrences'] / len(df), 2) * 100
     df_group_field = df_group_field.sort_values(by=group_field)
     return df_group_field
 
 try:
+    st.title('Which keys and modes are the most used by artists?')
     search_term = st.radio(
         "Search by:",
         ('Artist name', 'Spotify artist ID'))
+
+    url = 'https://support.tunecore.com/hc/en-us/articles/360040325651-How-do-I-find-my-Artist-ID-for-Spotify-and-iTunes-#'
+    st.caption('Check [this]({}) to know how to get the ID'.format(url))
 
     if search_term == 'Artist name':
         artist_search_term = st.text_input('Introduce an artist name', 'Lord Malvo')
@@ -115,28 +124,29 @@ try:
 
     if mode == 'name':
         artist_id = get_artist_id(artist_search_term)
-        artist_name = artist_search_term
+
     elif mode == 'id':
         artist_id = artist_search_term
-        artist_name = get_artist_name(artist_id)
 
+    artist_name = get_artist_name(artist_id) # It will be retaken, because maybe the input artist_name is interpreted as other's
     picture_url = get_artist_picture(artist_id)
 
-    # Spotify picture
-    #st.markdown(
-    #    "<img alt='SPOTIFY' src='https://cdn-icons-png.flaticon.com/512/174/174872.png' width='57px' height='57px' style='text-align: center; float: left'></img>",
-    #    unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
 
-    # Artist picture
-    st.markdown(
-        "<img alt='ARTIST' src='{}' width='250px' height='250px' style='text-align: center; float: center'></img>".format(picture_url),
-        unsafe_allow_html=True)
-    st.markdown(
-        "<p style='font-family: 'Gotham Rounded', sans-serif'>{}</p>".format(artist_name), unsafe_allow_html=True)
+    with col1:
+        # Artist picture
+        st.markdown(
+            "<img alt='ARTIST' src='{}' width='250px' height='250px' style='text-align: center; float: center'></img>".format(picture_url),
+            unsafe_allow_html=True)
+
+    with col2:
+        st.write("**Artist name**: {}".format(artist_name))
+        st.write("**Spotify artist ID**: {}".format(artist_id))
+        st.write("**Link to Spotify**:{} \n".format('https://open.spotify.com/artist/'+artist_id))
 
     try:
         df = get_tracks_info(artist_id)
-        st.dataframe(df)
+        #st.dataframe(df)
 
     except Exception as e:
         st.error(
@@ -146,15 +156,18 @@ try:
 
     tab1, tab2, tab3 = st.tabs(["By key", "By mode", "By key-mode"])
 
+    n_total_tracks = len(df)
 
     with tab1:
         try:
+            st.write('Total number of songs by artist: {}'.format(n_total_tracks))
             group_field = 'key'
             df_keys = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
 
             # Create distplot with custom bin_size
-            fig = px.histogram(df_keys, x=group_field, y='occurrences', color_discrete_sequence=['#1DB954'],
-                               labels={group_field: 'Key', 'occurrences': 'Occurrences over total (%)'})
+            fig = px.histogram(df_keys, x=group_field, y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
+                               labels={group_field: 'Key', 'album_name': 'Album name'})
+            fig.update_layout(yaxis_title='Nº of occurrences')
 
             # Plot!
             st.plotly_chart(fig)
@@ -166,12 +179,14 @@ try:
 
     with tab2:
         try:
+            st.write('Total number of songs by artist: {}'.format(n_total_tracks))
             group_field = 'mode'
             df_modes = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
 
             # Create distplot with custom bin_size
-            fig = px.histogram(df_modes, x=group_field, y='occurrences', color_discrete_sequence=['#1DB954'],
-                               labels={group_field: 'Mode', 'occurrences': 'Occurrences over total (%)'})
+            fig = px.histogram(df_modes, x=group_field, y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
+                               labels={group_field: 'Mode', 'album_name': 'Album name'})
+            fig.update_layout(yaxis_title='Nº of occurrences')
 
             # Plot!
             st.plotly_chart(fig)
@@ -183,12 +198,14 @@ try:
 
     with tab3:
         try:
+            st.write('Total number of songs by artist: {}'.format(n_total_tracks))
             group_field = 'mode'
             df_keys = transform_dataframe_to_histogram(df_tracks=df, group_field=group_field)
 
             # Create distplot with custom bin_size
-            fig = px.histogram(df_keys, x=group_field, y='occurrences', color_discrete_sequence=['#1DB954'],
-                               labels={group_field: 'Key', 'occurrences': 'Occurrences over total (%)'})
+            fig = px.histogram(df_keys, x=group_field, y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
+                               labels={group_field: 'Key', 'album_name': 'Album name'})
+            fig.update_layout(yaxis_title='Nº of occurrences')
 
             # Plot!
             st.plotly_chart(fig)

@@ -10,7 +10,8 @@ map_keys = {
     8: 'G#/Ab',
 	9: 'A',
 	10: 'A#/Bb',
-	11: 'B'
+	11: 'B',
+    -1: 'Undefined'
     }
 
 map_modes = {
