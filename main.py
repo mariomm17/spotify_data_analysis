@@ -14,8 +14,8 @@ def spotify_connection():
     # POST
     auth_response = requests.post(AUTH_URL, {
         'grant_type': 'client_credentials',
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
+        'client_id': st.secrets['CLIENT_ID'],
+        'client_secret': st.secrets['CLIENT_SECRET'],
     })
     print(auth_response)
 
