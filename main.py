@@ -6,10 +6,11 @@ from utils import map_keys, map_modes
 
 # base URL of all Spotify API endpoints
 BASE_URL = 'https://api.spotify.com/v1/'
+
 @st.cache
 def spotify_connection():
-    CLIENT_ID = '3198847a0df0428498cd64c7cbb3bb72'
-    CLIENT_SECRET = '115b947ecf3044448a6265782d644f4c'
+    CLIENT_ID = st.secrets.CLIENT_ID
+    CLIENT_SECRET = st.secrets.CLIENT_ID
     AUTH_URL = 'https://accounts.spotify.com/api/token'
 
     # POST
