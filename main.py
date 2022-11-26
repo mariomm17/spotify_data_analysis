@@ -37,7 +37,7 @@ def spotify_connection():
 def get_artist_id(artist_name: str):
     headers = spotify_connection()
 
-    query_result =requests.get(BASE_URL + 'search/', headers=headers, params={ 'q': artist_name, 'type': 'artist', 'limit':1}).json()
+    query_result = requests.get(BASE_URL + 'search/', headers=headers, params={ 'q': artist_name, 'type': 'artist', 'limit': 1}).json()
     artist_id = query_result['artists']['items'][0]['id']
 
     return artist_id
@@ -130,7 +130,7 @@ try:
         ('Artist name', 'Spotify artist ID'))
 
     url = 'https://artists.spotify.com/help/article/finding-your-artist-url'
-    st.caption("Couldn't find your artist by name? Check [this]({}) to know how to get the ID.".format(url))
+    st.caption("Couldn't find your artist by name? Check [this]({}) to know how to get the Spotify ID.".format(url))
 
     if search_term == 'Artist name':
         artist_search_term = st.text_input('Introduce an artist name', 'Lord Malvo')
@@ -231,10 +231,21 @@ try:
                 """**Histogram could not be built for group/artist selected** \n
                 {}""".format(e))
 
+    menu_and_footer_style = """
+            <style>
+            #MainMenu {visibility: hidden; }
+            footer {visibility: visible;}
+            footer:before{content: 'With ❤ from Málaga, Spain  -  Mario Muñoz';
+                         display: block;
+                         position: relative;
+                         bottom: 6px}
+            </style>
+            """
+    st.markdown(menu_and_footer_style, unsafe_allow_html=True)
+
 except Exception as e:
     st.error(
         """
-        **{}** \n
-        Error: %s
+            Error: **{}** \n
     """.format(e)
     )
