@@ -94,6 +94,8 @@ def get_tracks_info(artist_id: str):
     df_songs_pivot = df_songs_pivot[cols]
     return df_songs_pivot
 
+
+@st.cache
 def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_fields: str):
     df_aux = df_tracks.copy()
     df_aux['occurrences'] = 1
@@ -222,7 +224,7 @@ try:
             # Create distplot with custom bin_size
             fig = px.histogram(df_keys, x='key_mode', y='occurrences', color='album_name', color_discrete_sequence=['#1DB954'],
                                labels={group_field: 'Key-Mode', 'album_name': 'Album name'})
-            fig.update_layout(yaxis_title='Nº of occurrences')
+            fig.update_layout(xaxis_title='Key-Mode', yaxis_title='Nº of occurrences')
 
             # Plot!
             st.plotly_chart(fig)
