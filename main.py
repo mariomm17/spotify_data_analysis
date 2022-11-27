@@ -124,6 +124,7 @@ def transform_dataframe_to_histogram(df_tracks: pd.DataFrame, group_fields: str)
     return df_group_field_final
 
 try:
+    st.set_page_config(page_title='Spotifysis', page_icon='🎵')
     st.title('Which keys and modes are the most used by artists?')
     search_term = st.radio(
         "Search by:",
